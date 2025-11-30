@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Traffic & House Hunter - Arvada, CO</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" 
+          crossorigin=""/>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #2c3e50, #3498db);
+            color: white;
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+        }
+        
+        header h1 {
+            font-size: 1.4rem;
+            font-weight: 600;
+        }
+        
+        header .subtitle {
+            font-size: 0.85rem;
+            opacity: 0.9;
+        }
+        
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        
+        .sidebar {
+            width: 350px;
+            background: #f8f9fa;
+            border-right: 1px solid #dee2e6;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .sidebar-section {
+            padding: 15px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .sidebar-section h3 {
+            font-size: 0.9rem;
+            color: #495057;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .address-input-group {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .address-input-group input {
+            flex: 1;
+            padding: 10px 12px;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            font-size: 0.95rem;
+        }
+        
+        .address-input-group input:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.15);
+        }
+        
+        .btn {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+        
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 0.8rem;
+        }
+        
+        .label-input {
+            margin-top: 8px;
+        }
+        
+        .label-input input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+        
+        .pins-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px 15px;
+        }
+        
+        .pin-item {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .pin-item:hover {
+            border-color: #3498db;
+            box-shadow: 0 2px 8px rgba(52, 152, 219, 0.15);
+        }
+        
+        .pin-item .pin-label {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 4px;
+        }
+        
+        .pin-item .pin-address {
+            font-size: 0.85rem;
+            color: #6c757d;
+            margin-bottom: 8px;
+        }
+        
+        .pin-item .pin-actions {
+            display: flex;
+            gap: 6px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #6c757d;
+        }
+        
+        .empty-state svg {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 12px;
+            opacity: 0.5;
+        }
+        
+        #map {
+            flex: 1;
+            z-index: 1;
+        }
+        
+        /* Legend */
+        .legend {
+            position: absolute;
+            bottom: 30px;
+            right: 10px;
+            background: white;
+            padding: 12px 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+            z-index: 1000;
+            font-size: 0.85rem;
+        }
+        
+        .legend h4 {
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+            color: #2c3e50;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+        
+        .legend-color {
+            width: 24px;
+            height: 14px;
+            border-radius: 3px;
+            margin-right: 8px;
+        }
+        
+        /* Loading overlay */
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255,255,255,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+        
+        .loading-overlay.hidden {
+            display: none;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Controls */
+        .map-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .control-btn {
+            background: white;
+            border: none;
+            padding: 10px 14px;
+            border-radius: 6px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+            cursor: pointer;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+        
+        .control-btn:hover {
+            background: #f8f9fa;
+        }
+        
+        .control-btn.active {
+            background: #3498db;
+            color: white;
+        }
+        
+        /* Traffic popup */
+        .traffic-popup {
+            min-width: 200px;
+        }
+        
+        .traffic-popup h4 {
+            margin-bottom: 8px;
+            color: #2c3e50;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 6px;
+        }
+        
+        .traffic-popup .stat {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+            font-size: 0.9rem;
+        }
+        
+        .traffic-popup .stat-label {
+            color: #6c757d;
+        }
+        
+        .traffic-popup .stat-value {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .traffic-popup .noise-warning {
+            margin-top: 10px;
+            padding: 8px;
+            background: #fff3cd;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            color: #856404;
+        }
+        
+        /* Toast notifications */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #2c3e50;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            z-index: 3000;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .toast.show {
+            opacity: 1;
+        }
+        
+        /* Data controls */
+        .data-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .data-controls label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+        
+        .filter-slider {
+            width: 100%;
+        }
+        
+        .filter-value {
+            font-weight: 600;
+            color: #3498db;
+        }
+        
+        /* Export/Import buttons */
+        .export-import {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        
+        /* Base layer selector */
+        .layer-select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                position: absolute;
+                bottom: 0;
+                height: 40%;
+                border-right: none;
+                border-top: 1px solid #dee2e6;
+                z-index: 1000;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div>
+            <h1>🏠 Traffic & House Hunter</h1>
+            <div class="subtitle">Visualize DRCOG traffic data for home buying in Arvada, CO</div>
+        </div>
+    </header>
+    
+    <div class="main-container">
+        <aside class="sidebar">
+            <div class="sidebar-section">
+                <h3>📍 Add Address</h3>
+                <div class="address-input-group">
+                    <input type="text" id="address-input" placeholder="Enter or paste address from Zillow...">
+                    <button class="btn btn-primary" id="add-pin-btn" title="Add Pin">+</button>
+                </div>
+                <div class="label-input">
+                    <input type="text" id="label-input" placeholder="Label (e.g., '3BR Ranch - $450k')">
+                </div>
+            </div>
+            
+            <div class="sidebar-section">
+                <h3>⚙️ Data Controls</h3>
+                <div class="data-controls">
+                    <label>
+                        <input type="checkbox" id="toggle-traffic" checked>
+                        Show Traffic Data
+                    </label>
+                    <div>
+                        <label>Min AADT Filter: <span class="filter-value" id="filter-value">0</span></label>
+                        <input type="range" id="aadt-filter" class="filter-slider" min="0" max="50000" value="0" step="1000">
+                    </div>
+                    <div>
+                        <label>Base Map:</label>
+                        <select id="base-layer" class="layer-select">
+                            <option value="streets">Streets</option>
+                            <option value="satellite">Satellite</option>
+                            <option value="topo">Topographic</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="export-import">
+                    <button class="btn btn-secondary btn-sm" id="export-btn">Export Pins</button>
+                    <button class="btn btn-secondary btn-sm" id="import-btn">Import Pins</button>
+                    <input type="file" id="import-file" accept=".json" style="display: none;">
+                </div>
+            </div>
+            
+            <div class="sidebar-section" style="flex-shrink: 0;">
+                <h3>📌 Saved Pins (<span id="pin-count">0</span>)</h3>
+            </div>
+            
+            <div class="pins-list" id="pins-list">
+                <div class="empty-state">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <p>No pins yet</p>
+                    <p style="font-size: 0.85rem;">Add an address to get started</p>
+                </div>
+            </div>
+        </aside>
+        
+        <div id="map"></div>
+        
+        <div class="legend">
+            <h4>Traffic Volume (AADT)</h4>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #2ecc71;"></div>
+                <span>&lt; 1,000 (Very Low)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #f1c40f;"></div>
+                <span>1,000 - 5,000 (Low)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #e67e22;"></div>
+                <span>5,000 - 15,000 (Moderate)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #e74c3c;"></div>
+                <span>15,000 - 30,000 (High)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #8e44ad;"></div>
+                <span>&gt; 30,000 (Very High)</span>
+            </div>
+        </div>
+        
+        <div class="loading-overlay hidden" id="loading">
+            <div class="spinner"></div>
+        </div>
+    </div>
+    
+    <div class="toast" id="toast"></div>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" 
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" 
+            crossorigin=""></script>
+    
+    <script>
+        // ==========================================
+        // Configuration
+        // ==========================================
+        const CONFIG = {
+            center: [39.8028, -105.0875], // Arvada, CO
+            zoom: 12,
+            minZoom: 9,
+            maxZoom: 18,
+            storageKey: 'traffic-house-hunter-pins',
+            geocodeDelay: 1000, // Rate limiting for Nominatim
+            // Bounding box for Denver metro area
+            bounds: {
+                minLat: 39.5,
+                maxLat: 40.1,
+                minLon: -105.3,
+                maxLon: -104.5
+            }
+        };
+        
+        // Traffic color scale
+        const TRAFFIC_COLORS = {
+            veryLow: { max: 1000, color: '#2ecc71' },
+            low: { max: 5000, color: '#f1c40f' },
+            moderate: { max: 15000, color: '#e67e22' },
+            high: { max: 30000, color: '#e74c3c' },
+            veryHigh: { max: Infinity, color: '#8e44ad' }
+        };
+        
+        // ==========================================
+        // State
+        // ==========================================
+        let map;
+        let pins = [];
+        let pinMarkers = {};
+        let trafficLayer;
+        let trafficData = [];
+        let baseLayers = {};
+        let currentMinAADT = 0;
+        let lastGeocode = 0;
+        
+        // ==========================================
+        // Initialize Map
+        // ==========================================
+        function initMap() {
+            // Create map
+            map = L.map('map', {
+                center: CONFIG.center,
+                zoom: CONFIG.zoom,
+                minZoom: CONFIG.minZoom,
+                maxZoom: CONFIG.maxZoom
+            });
+            
+            // Base layers
+            baseLayers.streets = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            });
+            
+            baseLayers.satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: 'Tiles © Esri'
+            });
+            
+            baseLayers.topo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenTopoMap contributors'
+            });
+            
+            // Add default layer
+            baseLayers.streets.addTo(map);
+            
+            // Create traffic layer group
+            trafficLayer = L.layerGroup().addTo(map);
+            
+            // Load saved pins
+            loadPins();
+            
+            // Load traffic data
+            loadTrafficData();
+        }
+        
+        // ==========================================
+        // Traffic Data Functions
+        // ==========================================
+        function getTrafficColor(aadt) {
+            if (aadt < TRAFFIC_COLORS.veryLow.max) return TRAFFIC_COLORS.veryLow.color;
+            if (aadt < TRAFFIC_COLORS.low.max) return TRAFFIC_COLORS.low.color;
+            if (aadt < TRAFFIC_COLORS.moderate.max) return TRAFFIC_COLORS.moderate.color;
+            if (aadt < TRAFFIC_COLORS.high.max) return TRAFFIC_COLORS.high.color;
+            return TRAFFIC_COLORS.veryHigh.color;
+        }
+        
+        function getNoiseLevel(aadt) {
+            if (aadt < 1000) return 'Minimal noise impact';
+            if (aadt < 5000) return 'Light background noise';
+            if (aadt < 15000) return 'Noticeable traffic noise';
+            if (aadt < 30000) return 'Significant noise - audible indoors';
+            return 'Very loud - not recommended for noise-sensitive buyers';
+        }
+        
+        async function loadTrafficData() {
+            showLoading(true);
+            
+            try {
+                // Primary: DRCOG Regional Traffic Count Program data
+                // Source: https://experience.arcgis.com/experience/d31c861edab6491ab20909e65a794710
+                const bbox = CONFIG.bounds;
+                const drcogUrl = `https://services2.arcgis.com/lCUrzfRwZYxmwIse/arcgis/rest/services/Traffic_Counts_2024_Merged_11242025/FeatureServer/1/query?where=1%3D1&geometry=${bbox.minLon},${bbox.minLat},${bbox.maxLon},${bbox.maxLat}&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&f=geojson&outSR=4326`;
+                
+                console.log('Loading DRCOG traffic data...');
+                const response = await fetch(drcogUrl);
+                
+                if (!response.ok) {
+                    throw new Error('Failed to fetch DRCOG traffic data');
+                }
+                
+                const data = await response.json();
+                trafficData = data.features || [];
+                
+                console.log(`Loaded ${trafficData.length} DRCOG traffic count stations`);
+                
+                // Mark data source
+                trafficData.forEach(f => f.properties._source = 'DRCOG');
+                
+                renderTrafficData();
+                showToast(`Loaded ${trafficData.length} DRCOG traffic count locations`);
+                
+            } catch (error) {
+                console.error('Error loading DRCOG traffic data:', error);
+                showToast('DRCOG data unavailable. Trying CDOT backup...');
+                
+                // Try CDOT as fallback
+                await loadCDOTTrafficData();
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        async function loadCDOTTrafficData() {
+            // Fallback: CDOT Traffic Explorer data
+            try {
+                const bbox = CONFIG.bounds;
+                const url = `https://dtdapps.coloradodot.info/arcgis/rest/services/OTIS/TrafficExplorer/MapServer/0/query?where=1%3D1&geometry=${bbox.minLon},${bbox.minLat},${bbox.maxLon},${bbox.maxLat}&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&f=geojson&outSR=4326`;
+                
+                const response = await fetch(url);
+                if (response.ok) {
+                    const data = await response.json();
+                    trafficData = data.features || [];
+                    trafficData.forEach(f => f.properties._source = 'CDOT');
+                    renderTrafficData();
+                    showToast(`Loaded ${trafficData.length} CDOT traffic stations (fallback)`);
+                }
+            } catch (e) {
+                console.error('CDOT fallback also failed:', e);
+                showToast('Unable to load traffic data. Please try again later.');
+            }
+        }
+        
+        function renderTrafficData() {
+            trafficLayer.clearLayers();
+            
+            const filteredData = trafficData.filter(feature => {
+                const aadt = getAADTValue(feature.properties);
+                return aadt >= currentMinAADT;
+            });
+            
+            filteredData.forEach(feature => {
+                const props = feature.properties;
+                const aadt = getAADTValue(props);
+                const color = getTrafficColor(aadt);
+                
+                if (feature.geometry.type === 'Point') {
+                    // Point data - show as circle markers
+                    const coords = feature.geometry.coordinates;
+                    const marker = L.circleMarker([coords[1], coords[0]], {
+                        radius: Math.min(8 + Math.log10(aadt + 1) * 2, 15),
+                        fillColor: color,
+                        color: '#fff',
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.8
+                    });
+                    
+                    marker.bindPopup(createTrafficPopup(props));
+                    trafficLayer.addLayer(marker);
+                    
+                } else if (feature.geometry.type === 'LineString' || feature.geometry.type === 'MultiLineString') {
+                    // Line data - show as colored lines
+                    const line = L.geoJSON(feature, {
+                        style: {
+                            color: color,
+                            weight: 4 + Math.min(aadt / 10000, 4),
+                            opacity: 0.8
+                        }
+                    });
+                    
+                    line.bindPopup(createTrafficPopup(props));
+                    trafficLayer.addLayer(line);
+                }
+            });
+        }
+        
+        // Helper to extract AADT value from different data sources
+        function getAADTValue(props) {
+            // DRCOG uses Max_volume or v1_vol fields
+            if (props.Max_volume) return props.Max_volume;
+            if (props.v1_vol) return props.v1_vol;
+            // CDOT uses AADT
+            if (props.AADT) return props.AADT;
+            if (props.aadt) return props.aadt;
+            return 0;
+        }
+        
+        // Get the most recent count date from DRCOG data
+        function getMostRecentDate(props) {
+            // Check for date fields in DRCOG format
+            for (let i = 1; i <= 20; i++) {
+                const dateField = `v${i}_date`;
+                if (props[dateField]) return props[dateField];
+            }
+            // Fallback to year fields
+            if (props.AADTYR) return props.AADTYR;
+            if (props.YEAR) return props.YEAR;
+            if (props.year) return props.year;
+            return 'N/A';
+        }
+        
+        function createTrafficPopup(props) {
+            const aadt = getAADTValue(props);
+            const date = getMostRecentDate(props);
+            
+            // DRCOG uses "Location" field, CDOT uses various fields
+            const location = props.Location || props.COUNTLOCATION || props.LOCATION || props.location || 'Traffic Count Station';
+            const route = props.ROUTE || props.route || '';
+            const source = props._source || 'Unknown';
+            
+            // For DRCOG, show count history if available
+            const countNum = props.count_ || '';
+            
+            // CDOT truck data
+            const truckAadt = props.AADTTRUCKS || props.TRKAADT || '';
+            
+            const noiseLevel = typeof aadt === 'number' && aadt > 0 ? getNoiseLevel(aadt) : '';
+            const showWarning = typeof aadt === 'number' && aadt >= 20000;
+            
+            return `
+                <div class="traffic-popup">
+                    <h4>${route ? `Route ${route}` : 'Traffic Count'}</h4>
+                    <p style="margin-bottom: 8px; font-size: 0.85rem; color: #666;">${location}</p>
+                    <div class="stat">
+                        <span class="stat-label">Daily Traffic (AADT):</span>
+                        <span class="stat-value">${typeof aadt === 'number' && aadt > 0 ? aadt.toLocaleString() : 'N/A'}</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Count Date:</span>
+                        <span class="stat-value">${date}</span>
+                    </div>
+                    ${countNum ? `
+                    <div class="stat">
+                        <span class="stat-label">Total Counts:</span>
+                        <span class="stat-value">${countNum}</span>
+                    </div>
+                    ` : ''}
+                    ${truckAadt ? `
+                    <div class="stat">
+                        <span class="stat-label">Truck AADT:</span>
+                        <span class="stat-value">${truckAadt.toLocaleString()}</span>
+                    </div>
+                    ` : ''}
+                    <div class="stat" style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #eee;">
+                        <span class="stat-label">Source:</span>
+                        <span class="stat-value">${source}</span>
+                    </div>
+                    ${noiseLevel ? `
+                    <div class="noise-warning" style="background: ${showWarning ? '#f8d7da' : '#d4edda'}; color: ${showWarning ? '#721c24' : '#155724'};">
+                        🔊 ${noiseLevel}
+                    </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+        
+        // ==========================================
+        // Geocoding Functions
+        // ==========================================
+        async function geocodeAddress(address) {
+            // Rate limiting
+            const now = Date.now();
+            const timeSinceLastRequest = now - lastGeocode;
+            if (timeSinceLastRequest < CONFIG.geocodeDelay) {
+                await new Promise(resolve => setTimeout(resolve, CONFIG.geocodeDelay - timeSinceLastRequest));
+            }
+            lastGeocode = Date.now();
+            
+            // Add Colorado context to improve results
+            const searchQuery = address.toLowerCase().includes('co') || address.toLowerCase().includes('colorado') 
+                ? address 
+                : `${address}, Colorado`;
+            
+            const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=1&addressdetails=1`;
+            
+            const response = await fetch(url, {
+                headers: {
+                    'User-Agent': 'TrafficHouseHunter/1.0'
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error('Geocoding request failed');
+            }
+            
+            const data = await response.json();
+            
+            if (data.length === 0) {
+                throw new Error('Address not found');
+            }
+            
+            return {
+                lat: parseFloat(data[0].lat),
+                lon: parseFloat(data[0].lon),
+                displayName: data[0].display_name
+            };
+        }
+        
+        // ==========================================
+        // Pin Management
+        // ==========================================
+        function loadPins() {
+            try {
+                const saved = localStorage.getItem(CONFIG.storageKey);
+                if (saved) {
+                    pins = JSON.parse(saved);
+                    pins.forEach(pin => addPinToMap(pin));
+                    updatePinsList();
+                }
+            } catch (e) {
+                console.error('Error loading pins:', e);
+                pins = [];
+            }
+        }
+        
+        function savePins() {
+            try {
+                localStorage.setItem(CONFIG.storageKey, JSON.stringify(pins));
+            } catch (e) {
+                console.error('Error saving pins:', e);
+                showToast('Error saving pins');
+            }
+        }
+        
+        function addPinToMap(pin) {
+            const marker = L.marker([pin.lat, pin.lon], {
+                icon: L.divIcon({
+                    className: 'custom-pin',
+                    html: `<div style="
+                        background: #3498db;
+                        width: 30px;
+                        height: 30px;
+                        border-radius: 50% 50% 50% 0;
+                        transform: rotate(-45deg);
+                        border: 3px solid white;
+                        box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+                    "><div style="
+                        transform: rotate(45deg);
+                        text-align: center;
+                        line-height: 24px;
+                        font-size: 14px;
+                    ">🏠</div></div>`,
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 30],
+                    popupAnchor: [0, -30]
+                })
+            });
+            
+            marker.bindPopup(`
+                <div style="min-width: 200px;">
+                    <h4 style="margin: 0 0 8px 0; color: #2c3e50;">${pin.label || 'Saved Location'}</h4>
+                    <p style="margin: 0; font-size: 0.85rem; color: #666;">${pin.address}</p>
+                    <p style="margin: 8px 0 0 0; font-size: 0.8rem; color: #999;">
+                        ${pin.lat.toFixed(5)}, ${pin.lon.toFixed(5)}
+                    </p>
+                </div>
+            `);
+            
+            pinMarkers[pin.id] = marker;
+            marker.addTo(map);
+        }
+        
+        function removePinFromMap(pinId) {
+            if (pinMarkers[pinId]) {
+                map.removeLayer(pinMarkers[pinId]);
+                delete pinMarkers[pinId];
+            }
+        }
+        
+        async function addNewPin() {
+            const addressInput = document.getElementById('address-input');
+            const labelInput = document.getElementById('label-input');
+            
+            const address = addressInput.value.trim();
+            const label = labelInput.value.trim();
+            
+            if (!address) {
+                showToast('Please enter an address');
+                return;
+            }
+            
+            showLoading(true);
+            
+            try {
+                const result = await geocodeAddress(address);
+                
+                const pin = {
+                    id: Date.now().toString(),
+                    address: result.displayName,
+                    label: label || address,
+                    lat: result.lat,
+                    lon: result.lon,
+                    createdAt: new Date().toISOString()
+                };
+                
+                pins.push(pin);
+                savePins();
+                addPinToMap(pin);
+                updatePinsList();
+                
+                // Clear inputs
+                addressInput.value = '';
+                labelInput.value = '';
+                
+                // Pan to new pin
+                map.setView([pin.lat, pin.lon], 15);
+                pinMarkers[pin.id].openPopup();
+                
+                showToast('Pin added successfully!');
+                
+            } catch (error) {
+                console.error('Error adding pin:', error);
+                showToast(error.message || 'Error adding pin');
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        function deletePin(pinId) {
+            pins = pins.filter(p => p.id !== pinId);
+            savePins();
+            removePinFromMap(pinId);
+            updatePinsList();
+            showToast('Pin deleted');
+        }
+        
+        function focusPin(pinId) {
+            const pin = pins.find(p => p.id === pinId);
+            if (pin && pinMarkers[pinId]) {
+                map.setView([pin.lat, pin.lon], 16);
+                pinMarkers[pinId].openPopup();
+            }
+        }
+        
+        function updatePinsList() {
+            const container = document.getElementById('pins-list');
+            const countEl = document.getElementById('pin-count');
+            
+            countEl.textContent = pins.length;
+            
+            if (pins.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <p>No pins yet</p>
+                        <p style="font-size: 0.85rem;">Add an address to get started</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = pins.map(pin => `
+                <div class="pin-item" onclick="focusPin('${pin.id}')">
+                    <div class="pin-label">${escapeHtml(pin.label)}</div>
+                    <div class="pin-address">${escapeHtml(pin.address.split(',').slice(0, 2).join(','))}</div>
+                    <div class="pin-actions">
+                        <button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); deletePin('${pin.id}')">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // ==========================================
+        // Export/Import Functions
+        // ==========================================
+        function exportPins() {
+            if (pins.length === 0) {
+                showToast('No pins to export');
+                return;
+            }
+            
+            const data = JSON.stringify(pins, null, 2);
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `traffic-house-hunter-pins-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            
+            URL.revokeObjectURL(url);
+            showToast('Pins exported!');
+        }
+        
+        function importPins(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const importedPins = JSON.parse(e.target.result);
+                    
+                    if (!Array.isArray(importedPins)) {
+                        throw new Error('Invalid file format');
+                    }
+                    
+                    // Add imported pins
+                    importedPins.forEach(pin => {
+                        if (pin.lat && pin.lon && !pins.find(p => p.id === pin.id)) {
+                            pins.push(pin);
+                            addPinToMap(pin);
+                        }
+                    });
+                    
+                    savePins();
+                    updatePinsList();
+                    showToast(`Imported ${importedPins.length} pins`);
+                    
+                } catch (error) {
+                    console.error('Import error:', error);
+                    showToast('Error importing pins');
+                }
+            };
+            reader.readAsText(file);
+            
+            // Reset file input
+            event.target.value = '';
+        }
+        
+        // ==========================================
+        // UI Helpers
+        // ==========================================
+        function showLoading(show) {
+            document.getElementById('loading').classList.toggle('hidden', !show);
+        }
+        
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // ==========================================
+        // Event Listeners
+        // ==========================================
+        document.addEventListener('DOMContentLoaded', () => {
+            initMap();
+            
+            // Add pin button
+            document.getElementById('add-pin-btn').addEventListener('click', addNewPin);
+            
+            // Enter key in address input
+            document.getElementById('address-input').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') addNewPin();
+            });
+            
+            // Toggle traffic data
+            document.getElementById('toggle-traffic').addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    trafficLayer.addTo(map);
+                } else {
+                    map.removeLayer(trafficLayer);
+                }
+            });
+            
+            // AADT filter
+            document.getElementById('aadt-filter').addEventListener('input', (e) => {
+                currentMinAADT = parseInt(e.target.value);
+                document.getElementById('filter-value').textContent = currentMinAADT.toLocaleString();
+                renderTrafficData();
+            });
+            
+            // Base layer selector
+            document.getElementById('base-layer').addEventListener('change', (e) => {
+                Object.values(baseLayers).forEach(layer => map.removeLayer(layer));
+                baseLayers[e.target.value].addTo(map);
+            });
+            
+            // Export/Import
+            document.getElementById('export-btn').addEventListener('click', exportPins);
+            document.getElementById('import-btn').addEventListener('click', () => {
+                document.getElementById('import-file').click();
+            });
+            document.getElementById('import-file').addEventListener('change', importPins);
+        });
+    </script>
+</body>
+</html>
