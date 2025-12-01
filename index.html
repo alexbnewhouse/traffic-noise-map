@@ -10,6 +10,11 @@
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" 
           crossorigin=""/>
     
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    
     <style>
         * {
             margin: 0;
@@ -43,6 +48,66 @@
         header .subtitle {
             font-size: 0.85rem;
             opacity: 0.9;
+        }
+        
+        .auth-section {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .auth-section .user-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+        }
+        
+        .auth-section .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.3);
+        }
+        
+        .auth-section .user-name {
+            max-width: 120px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .btn-auth {
+            padding: 8px 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            background: rgba(255,255,255,0.1);
+            color: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .btn-auth:hover {
+            background: rgba(255,255,255,0.2);
+            border-color: rgba(255,255,255,0.5);
+        }
+        
+        .sync-status {
+            font-size: 0.75rem;
+            opacity: 0.8;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .sync-status.synced {
+            color: #2ecc71;
+        }
+        
+        .sync-status.local {
+            color: #f39c12;
         }
         
         .main-container {
@@ -429,6 +494,14 @@
             <h1>🏠 Traffic & House Hunter</h1>
             <div class="subtitle">Visualize DRCOG traffic data for home buying in Arvada, CO</div>
         </div>
+        <div class="auth-section">
+            <div id="auth-status" class="sync-status local">💾 Local storage</div>
+            <div id="user-info" class="user-info" style="display: none;">
+                <img id="user-avatar" class="user-avatar" src="" alt="">
+                <span id="user-name" class="user-name"></span>
+            </div>
+            <button id="auth-btn" class="btn-auth">Sign in with Google</button>
+        </div>
     </header>
     
     <div class="main-container">
@@ -529,6 +602,31 @@
             crossorigin=""></script>
     
     <script>
+        // ==========================================
+        // Firebase Configuration
+        // ==========================================
+        // TODO: Replace with your Firebase config from console.firebase.google.com
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+        
+        // Initialize Firebase (only if config is set)
+        let auth = null;
+        let db = null;
+        let currentUser = null;
+        const FIREBASE_ENABLED = firebaseConfig.apiKey !== "YOUR_API_KEY";
+        
+        if (FIREBASE_ENABLED) {
+            firebase.initializeApp(firebaseConfig);
+            auth = firebase.auth();
+            db = firebase.firestore();
+        }
+        
         // ==========================================
         // Configuration
         // ==========================================
@@ -851,9 +949,19 @@
         }
         
         // ==========================================
-        // Pin Management
+        // Pin Management (Cloud + Local)
         // ==========================================
-        function loadPins() {
+        
+        // Load pins - from cloud if logged in, otherwise localStorage
+        async function loadPins() {
+            if (currentUser && FIREBASE_ENABLED) {
+                await loadPinsFromCloud();
+            } else {
+                loadPinsFromLocalStorage();
+            }
+        }
+        
+        function loadPinsFromLocalStorage() {
             try {
                 const saved = localStorage.getItem(CONFIG.storageKey);
                 if (saved) {
@@ -862,17 +970,101 @@
                     updatePinsList();
                 }
             } catch (e) {
-                console.error('Error loading pins:', e);
+                console.error('Error loading pins from localStorage:', e);
                 pins = [];
             }
         }
         
-        function savePins() {
+        async function loadPinsFromCloud() {
+            try {
+                const snapshot = await db.collection('users').doc(currentUser.uid)
+                    .collection('pins').get();
+                
+                pins = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                
+                // Clear existing markers
+                Object.values(pinMarkers).forEach(marker => map.removeLayer(marker));
+                pinMarkers = {};
+                
+                pins.forEach(pin => addPinToMap(pin));
+                updatePinsList();
+                console.log(`Loaded ${pins.length} pins from cloud`);
+            } catch (e) {
+                console.error('Error loading pins from cloud:', e);
+                showToast('Error loading pins from cloud, using local');
+                loadPinsFromLocalStorage();
+            }
+        }
+        
+        // Save pins - to cloud if logged in, otherwise localStorage
+        async function savePins() {
+            if (currentUser && FIREBASE_ENABLED) {
+                // Cloud saves happen per-pin, this is just for backup
+                saveToLocalStorage();
+            } else {
+                saveToLocalStorage();
+            }
+        }
+        
+        function saveToLocalStorage() {
             try {
                 localStorage.setItem(CONFIG.storageKey, JSON.stringify(pins));
             } catch (e) {
-                console.error('Error saving pins:', e);
-                showToast('Error saving pins');
+                console.error('Error saving pins to localStorage:', e);
+            }
+        }
+        
+        async function savePinToCloud(pin) {
+            if (!currentUser || !FIREBASE_ENABLED) return;
+            
+            try {
+                await db.collection('users').doc(currentUser.uid)
+                    .collection('pins').doc(pin.id).set(pin);
+                console.log('Pin saved to cloud:', pin.id);
+            } catch (e) {
+                console.error('Error saving pin to cloud:', e);
+                showToast('Error syncing to cloud');
+            }
+        }
+        
+        async function deletePinFromCloud(pinId) {
+            if (!currentUser || !FIREBASE_ENABLED) return;
+            
+            try {
+                await db.collection('users').doc(currentUser.uid)
+                    .collection('pins').doc(pinId).delete();
+                console.log('Pin deleted from cloud:', pinId);
+            } catch (e) {
+                console.error('Error deleting pin from cloud:', e);
+            }
+        }
+        
+        // Migrate localStorage pins to cloud on first login
+        async function migrateLocalPinsToCloud() {
+            const localPins = localStorage.getItem(CONFIG.storageKey);
+            if (!localPins || !currentUser || !FIREBASE_ENABLED) return;
+            
+            try {
+                const pinsToMigrate = JSON.parse(localPins);
+                if (pinsToMigrate.length === 0) return;
+                
+                // Check if user already has cloud pins
+                const existing = await db.collection('users').doc(currentUser.uid)
+                    .collection('pins').limit(1).get();
+                
+                if (existing.empty && pinsToMigrate.length > 0) {
+                    const migrate = confirm(`Found ${pinsToMigrate.length} local pins. Import them to your account?`);
+                    if (migrate) {
+                        showLoading(true);
+                        for (const pin of pinsToMigrate) {
+                            await savePinToCloud(pin);
+                        }
+                        showLoading(false);
+                        showToast(`Migrated ${pinsToMigrate.length} pins to cloud!`);
+                    }
+                }
+            } catch (e) {
+                console.error('Error migrating pins:', e);
             }
         }
         
@@ -949,6 +1141,7 @@
                 
                 pins.push(pin);
                 savePins();
+                await savePinToCloud(pin); // Save to cloud if logged in
                 addPinToMap(pin);
                 updatePinsList();
                 
@@ -970,9 +1163,10 @@
             }
         }
         
-        function deletePin(pinId) {
+        async function deletePin(pinId) {
             pins = pins.filter(p => p.id !== pinId);
             savePins();
+            await deletePinFromCloud(pinId); // Delete from cloud if logged in
             removePinFromMap(pinId);
             updatePinsList();
             showToast('Pin deleted');
@@ -1190,6 +1384,52 @@
         }
         
         // ==========================================
+        // Authentication Functions
+        // ==========================================
+        function updateAuthUI(user) {
+            const authBtn = document.getElementById('auth-btn');
+            const userInfo = document.getElementById('user-info');
+            const userAvatar = document.getElementById('user-avatar');
+            const userName = document.getElementById('user-name');
+            const authStatus = document.getElementById('auth-status');
+            
+            if (user) {
+                authBtn.textContent = 'Sign Out';
+                userInfo.style.display = 'flex';
+                userAvatar.src = user.photoURL || 'https://www.gravatar.com/avatar/?d=mp';
+                userName.textContent = user.displayName || user.email;
+                authStatus.textContent = '☁️ Synced to cloud';
+                authStatus.className = 'sync-status synced';
+            } else {
+                authBtn.textContent = 'Sign in with Google';
+                userInfo.style.display = 'none';
+                authStatus.textContent = '💾 Local storage';
+                authStatus.className = 'sync-status local';
+            }
+        }
+        
+        async function handleAuthClick() {
+            if (!FIREBASE_ENABLED) {
+                showToast('Firebase not configured. Using local storage.');
+                return;
+            }
+            
+            if (currentUser) {
+                // Sign out
+                await auth.signOut();
+            } else {
+                // Sign in with Google
+                const provider = new firebase.auth.GoogleAuthProvider();
+                try {
+                    await auth.signInWithPopup(provider);
+                } catch (e) {
+                    console.error('Sign in error:', e);
+                    showToast('Error signing in: ' + e.message);
+                }
+            }
+        }
+        
+        // ==========================================
         // UI Helpers
         // ==========================================
         function showLoading(show) {
@@ -1216,6 +1456,30 @@
         // Event Listeners
         // ==========================================
         document.addEventListener('DOMContentLoaded', () => {
+            // Set up Firebase auth listener
+            if (FIREBASE_ENABLED) {
+                auth.onAuthStateChanged(async (user) => {
+                    currentUser = user;
+                    updateAuthUI(user);
+                    
+                    if (user) {
+                        // User signed in - load from cloud
+                        await migrateLocalPinsToCloud();
+                        await loadPins();
+                    } else {
+                        // User signed out - load from localStorage
+                        // Clear existing pins from map first
+                        Object.values(pinMarkers).forEach(marker => map.removeLayer(marker));
+                        pinMarkers = {};
+                        pins = [];
+                        loadPins();
+                    }
+                });
+            }
+            
+            // Auth button
+            document.getElementById('auth-btn').addEventListener('click', handleAuthClick);
+            
             initMap();
             
             // Add pin button
